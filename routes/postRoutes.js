@@ -8,6 +8,7 @@ const {
   deletePost,
   toggleLikePost,
   sharePost,
+  getPostViewers,
   getMyPosts,
   getDashboardAnalytics,
 } = require("../controllers/postController");
@@ -18,6 +19,7 @@ const router = express.Router();
 router.get("/", listPosts);
 router.get("/mine", protect, getMyPosts);
 router.get("/analytics/dashboard", protect, getDashboardAnalytics);
+router.get("/:id/viewers", protect, getPostViewers);
 router.get("/:slug", optionalAuth, getPostBySlug);
 router.post("/", protect, createPost);
 router.put("/:id", protect, updatePost);

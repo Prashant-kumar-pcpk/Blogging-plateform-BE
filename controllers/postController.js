@@ -4,6 +4,7 @@ const Subscription = require("../models/Subscription");
 const slugify = require("../utils/slugify");
 
 const COMMENT_AUTHOR_FIELDS = "name username avatar";
+const VIEWER_FIELDS = "name username avatar";
 
 const listPosts = async (req, res) => {
   const {
@@ -78,6 +79,22 @@ const getPostBySlug = async (req, res) => {
 
   if (post.status === "published") {
     post.analytics.views += 1;
+
+    if (req.user) {
+      const viewerIndex = post.viewers.findIndex(
+        (entry) => entry.user.toString() === req.user._id.toString()
+      );
+
+      if (viewerIndex >= 0) {
+        post.viewers[viewerIndex].viewedAt = new Date();
+      } else {
+        post.viewers.push({
+          user: req.user._id,
+          viewedAt: new Date(),
+        });
+      }
+    }
+
     await post.save();
   }
 
@@ -261,6 +278,32 @@ const sharePost = async (req, res) => {
   res.json(post.analytics.shares);
 };
 
+const getPostViewers = async (req, res) => {
+  const post = await Post.findById(req.params.id).populate("viewers.user", VIEWER_FIELDS);
+
+  if (!post) {
+    res.status(404);
+    throw new Error("Post not found");
+  }
+
+  if (post.author.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error("Only the post author can see viewers");
+  }
+
+  const viewers = [...post.viewers]
+    .sort((a, b) => new Date(b.viewedAt).getTime() - new Date(a.viewedAt).getTime())
+    .map((entry) => ({
+      _id: entry.user?._id,
+      name: entry.user?.name || "Unknown user",
+      username: entry.user?.username || "",
+      avatar: entry.user?.avatar || "",
+      viewedAt: entry.viewedAt,
+    }));
+
+  res.json(viewers);
+};
+
 const getMyPosts = async (req, res) => {
   const posts = await Post.find({ author: req.user._id })
     .populate("categories", "name slug color")
@@ -312,6 +355,7 @@ module.exports = {
   deletePost,
   toggleLikePost,
   sharePost,
+  getPostViewers,
   getMyPosts,
   getDashboardAnalytics,
 };
