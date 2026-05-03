@@ -1,6 +1,7 @@
 const Category = require("../models/Category");
 const Subscription = require("../models/Subscription");
 const User = require("../models/User");
+const Post = require("../models/Post");
 
 const toggleSubscription = async (req, res) => {
   const { targetType, authorId, categoryId } = req.body;
@@ -55,7 +56,52 @@ const getMySubscriptions = async (req, res) => {
   res.json(subscriptions);
 };
 
+const getSubscriptionFeed = async (req, res) => {
+  const subscriptions = await Subscription.find({ subscriber: req.user._id }).lean();
+
+  const authorIds = subscriptions
+    .filter((subscription) => subscription.targetType === "author" && subscription.author)
+    .map((subscription) => subscription.author);
+  const categoryIds = subscriptions
+    .filter((subscription) => subscription.targetType === "category" && subscription.category)
+    .map((subscription) => subscription.category);
+
+  if (!authorIds.length && !categoryIds.length) {
+    return res.json([]);
+  }
+
+  const notifications = await Post.find({
+    status: "published",
+    $or: [
+      ...(authorIds.length ? [{ author: { $in: authorIds } }] : []),
+      ...(categoryIds.length ? [{ categories: { $in: categoryIds } }] : []),
+    ],
+  })
+    .populate("author", "name username avatar")
+    .populate("categories", "name slug color")
+    .sort({ publishedAt: -1, updatedAt: -1 })
+    .limit(12);
+
+  res.json(
+    notifications.map((post) => ({
+      _id: post._id,
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      publishedAt: post.publishedAt,
+      updatedAt: post.updatedAt,
+      author: post.author,
+      categories: post.categories,
+      analytics: post.analytics,
+      notificationType: authorIds.some((id) => id.toString() === post.author?._id?.toString())
+        ? "author"
+        : "category",
+    }))
+  );
+};
+
 module.exports = {
   toggleSubscription,
   getMySubscriptions,
+  getSubscriptionFeed,
 };

@@ -39,6 +39,8 @@ const userSchema = new mongoose.Schema(
     socialLinks: {
       twitter: String,
       linkedin: String,
+      facebook: String,
+      instagram: String,
       github: String,
       website: String,
     },
