@@ -18,9 +18,33 @@ const app = express();
 
 connectDB();
 
+const defaultAllowedOrigins = [
+  "http://localhost:3000",
+  "https://bloggingplatformprashant.netlify.app",
+];
+
+const allowedOrigins = [
+  ...new Set(
+    [
+      process.env.CLIENT_URL,
+      ...(process.env.CLIENT_URLS || "")
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+      ...defaultAllowedOrigins,
+    ].filter(Boolean)
+  ),
+];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
   })
 );
