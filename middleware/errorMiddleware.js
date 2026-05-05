@@ -17,7 +17,9 @@ const errorHandler = (err, req, res, next) => {
   res.status(statusCode).json({
     message:
       err.code === 11000
-        ? "Email or username already exists"
+        ? Object.keys(err.keyPattern || {}).some((key) => ["email", "username"].includes(key))
+          ? "Email or username already exists"
+          : "This value already exists"
         : err.message || "Server error",
     stack: process.env.NODE_ENV === "production" ? undefined : err.stack,
   });

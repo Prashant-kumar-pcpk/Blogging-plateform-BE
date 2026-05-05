@@ -123,6 +123,7 @@ const getPostBySlug = async (req, res) => {
   });
 
   let subscribed = false;
+  let liked = false;
 
   if (req.user) {
     const subscription = await Subscription.findOne({
@@ -131,9 +132,10 @@ const getPostBySlug = async (req, res) => {
       author: post.author._id,
     });
     subscribed = Boolean(subscription);
+    liked = post.likedBy.some((userId) => userId.toString() === req.user._id.toString());
   }
 
-  res.json({ ...post.toObject(), comments: filteredComments, subscribed });
+  res.json({ ...post.toObject(), comments: filteredComments, subscribed, liked });
 };
 
 const createPost = async (req, res) => {
@@ -322,13 +324,25 @@ const getDashboardAnalytics = async (req, res) => {
       acc.views += post.analytics.views;
       acc.likes += post.analytics.likes;
       acc.comments += post.analytics.commentsCount;
-      acc.shares += Object.values(post.analytics.shares.toObject()).reduce(
-        (sum, value) => sum + value,
-        0
-      );
+      Object.entries(post.analytics.shares.toObject()).forEach(([platform, value]) => {
+        acc.shareBreakdown[platform] += value;
+        acc.shares += value;
+      });
       return acc;
     },
-    { views: 0, likes: 0, comments: 0, shares: 0 }
+    {
+      views: 0,
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      shareBreakdown: {
+        facebook: 0,
+        twitter: 0,
+        linkedin: 0,
+        whatsapp: 0,
+        mail: 0,
+      },
+    }
   );
 
   const performance = posts.map((post) => ({
@@ -340,10 +354,26 @@ const getDashboardAnalytics = async (req, res) => {
     shares: Object.values(post.analytics.shares.toObject()).reduce((sum, value) => sum + value, 0),
   }));
 
+  const recentActivity = posts
+    .slice()
+    .sort((a, b) => new Date(b.publishedAt || b.createdAt).getTime() - new Date(a.publishedAt || a.createdAt).getTime())
+    .slice(0, 6)
+    .reverse()
+    .map((post) => ({
+      title: post.title,
+      slug: post.slug,
+      publishedAt: post.publishedAt || post.createdAt,
+      views: post.analytics.views,
+      likes: post.analytics.likes,
+      comments: post.analytics.commentsCount,
+      shares: Object.values(post.analytics.shares.toObject()).reduce((sum, value) => sum + value, 0),
+    }));
+
   res.json({
     totals,
     performance,
     postsPublished: posts.length,
+    recentActivity,
   });
 };
 

@@ -45,6 +45,17 @@ const getAuthorPage = async (req, res) => {
     .populate("tags", "name slug")
     .sort({ publishedAt: -1 });
 
+  const totals = posts.reduce(
+    (acc, post) => {
+      acc.views += post.analytics.views;
+      acc.likes += post.analytics.likes;
+      acc.comments += post.analytics.commentsCount;
+      acc.shares += Object.values(post.analytics.shares.toObject()).reduce((sum, value) => sum + value, 0);
+      return acc;
+    },
+    { views: 0, likes: 0, comments: 0, shares: 0 }
+  );
+
   let subscribed = false;
   if (req.user) {
     subscribed = Boolean(
@@ -60,6 +71,7 @@ const getAuthorPage = async (req, res) => {
     author,
     posts,
     subscribed,
+    totals,
   });
 };
 
